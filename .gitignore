@@ -1,0 +1,5 @@
+*.pyc
+.cache
+dist/
+build/
+porthos_python.egg-info/
