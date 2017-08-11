@@ -1,7 +1,7 @@
 client:
   build: .
   working_dir: /usr/src/app
-  command: dockerize -wait tcp://broker:5672 -timeout 60s pytest 
+  command: dockerize -wait tcp://broker:5672 -timeout 60s pytest
   links:
    - broker
   environment:
@@ -13,4 +13,3 @@ broker:
   image: rabbitmq:3.6-management
   ports:
    - "15672:15672"
-
