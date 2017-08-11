@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import pika
+import kombu
 
 from .call import Call, TimeoutException
 from .response import Response
@@ -11,7 +11,7 @@ class Client(object):
     def __init__(self, connection, service_name, default_timeout=60*1000):
         '''
         Creates a RPC client. Arguments:
-            - connection: string (amqp connection url) or an object ofpika.BlockingConnection.
+            - connection: string (amqp connection url) or an object of kombu.Connection.
             - service_name: the name of the service that holds the methods will intend to call.
             - default_timeout: default timeout of the remote calls.
         '''
@@ -26,9 +26,11 @@ class Client(object):
             self.external_connection = True
             self.connection = connection
 
-        self.channel = self.connection.channel()
-        self.response_queue = self.channel.queue_declare(exclusive=True).method.queue
-        self.channel.basic_consume(self._on_response, no_ack=True, queue=self.response_queue)
+        self.producer = self.connection.Producer(routing_key=service_name, auto_declare=True)
+        self.consumer = self.connection.Consumer(kombu.Queue(exclusive=True), callbacks=[self._on_response], auto_declare=True)
+        self.response_queue = self.consumer.queues[0]
+
+        self.consumer.consume()
 
     def __enter__(self):
         return self
@@ -37,11 +39,22 @@ class Client(object):
         self.close()
 
     def _get_connection(self, amqp_url):
-	return pika.BlockingConnection(pika.URLParameters(amqp_url))
+	   return kombu.Connection(amqp_url)
 
-    def _on_response(self, ch, method, props, content):
-        if self.current_call and self.current_call.corr_id == props.correlation_id:
-            self.current_call.response = Response(props.content_type, content)
+    def _on_response(self, content, message):
+        if self.current_call:
+            c_corr_id = self.current_call.corr_id
+            m_corr_id = message.properties.get('correlation_id')
+
+            self.current_call.correlation_match = c_corr_id == m_corr_id
+
+            if self.current_call.correlation_match:
+                message.ack()
+
+                self.current_call.response = Response(message.content_type, content, message.headers)
+                return
+
+        message.requeue()
 
     def call(self, method_name):
         '''
@@ -54,8 +67,6 @@ class Client(object):
         '''
         Close the resources allocated by this client.
         '''
-    	self.channel.close()
-
     	if self.external_connection:
     	    self.connection.close()
 

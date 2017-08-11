@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
+import time
 import json
 import uuid
-
-import pika
 
 
 class TimeoutException(Exception):
@@ -17,6 +16,7 @@ class Call(object):
         self.timeout = default_timeout
         self.body = None
         self.response = None
+        self.correlation_match = False
         self.content_type = 'application/octet-stream'
 
     def with_timeout(self, timeout):
@@ -55,21 +55,26 @@ class Call(object):
         Performs a sync call to the remote service.
         Returns a Response object.
         '''
-        self.client.channel.basic_publish(exchange='',
-                                          routing_key=self.client.service_name,
-                                          properties=pika.BasicProperties(
-                                                content_type=self.content_type,
-                                                headers={
-                                                    "X-Method": self.method_name
-                                                },
-                                                reply_to = self.client.response_queue,
-                                                correlation_id = self.corr_id,
-                                                expiration=str(self.timeout)
-                                                ),
-                                          body=self.body)
-
         timeout_in_secods = self.timeout / 1000.0
-        self.client.connection.process_data_events(time_limit=timeout_in_secods)
+
+        self.client.producer.publish(self.body,
+                                     routing_key=self.client.service_name,
+                                     content_type=self.content_type,
+                                     reply_to=self.client.response_queue.name,
+                                     correlation_id=self.corr_id,
+                                     expiration=timeout_in_secods,
+                                     headers={
+                                         "X-Method": self.method_name
+                                     })
+
+        while not self.correlation_match:
+            start = time.time()
+
+            if timeout_in_secods > 0:
+                self.client.connection.drain_events(timeout=timeout_in_secods)
+                timeout_in_secods -= time.time() - start
+            else:
+                break
 
         if self.response is None:
             raise TimeoutException()
