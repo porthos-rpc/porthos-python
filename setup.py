@@ -5,7 +5,7 @@ from setuptools import setup
 
 setup(
     name='porthos-python',
-    version='0.0.3',
+    version='0.0.4',
     author='Germano Fronza',
     author_email='germano.inf@gmail.com',
     maintainer='Germano Fronza',

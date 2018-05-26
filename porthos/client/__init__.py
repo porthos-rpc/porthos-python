@@ -39,7 +39,7 @@ class Client(object):
         self.close()
 
     def _get_connection(self, amqp_url):
-	   return kombu.Connection(amqp_url)
+       return kombu.Connection(amqp_url)
 
     def _on_response(self, content, message):
         if self.current_call:
@@ -60,13 +60,13 @@ class Client(object):
         '''
         Bulds the remote call with the given method_name.
         '''
-    	self.current_call = Call(self, method_name, self.default_timeout)
-    	return self.current_call
+        self.current_call = Call(self, method_name, self.default_timeout)
+        return self.current_call
 
     def close(self):
         '''
         Close the resources allocated by this client.
         '''
-    	if self.external_connection:
-    	    self.connection.close()
+        if not self.external_connection:
+            self.connection.close()
 
