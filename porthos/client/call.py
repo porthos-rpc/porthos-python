@@ -23,8 +23,8 @@ class Call(object):
         '''
         Sets a timeout for this call. In milliseconds.
         '''
-    	self.timeout = timeout
-    	return self
+        self.timeout = timeout
+        return self
 
     def with_body(self, body):
         '''
@@ -80,4 +80,3 @@ class Call(object):
             raise TimeoutException()
 
         return self.response
-
